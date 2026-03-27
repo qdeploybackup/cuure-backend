@@ -62,6 +62,7 @@ router.post("/book-appointment", async (req, res) => {
         "WEBSITE"
       ]
     );
+    console.log("✅ Appointment saved");
 
     console.log("📨 Calling mail function...");
 

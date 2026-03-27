@@ -4,10 +4,12 @@ const path = require("path");
 
 // LOGO (same as your UI version)
 const LOGO_BASE64 = fs.readFileSync(path.join(__dirname, "logo.jpeg")).toString("base64");
-const LOGO_MIME = "image/png";
+const LOGO_MIME = "image/jpeg";
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS

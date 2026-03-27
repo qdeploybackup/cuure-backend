@@ -1,0 +1,4 @@
+node_modules
+cuure.db
+service-account.json
+env.js

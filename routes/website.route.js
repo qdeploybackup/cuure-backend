@@ -6,6 +6,7 @@ const { sendAppointmentMail } = require("../utils/mailer");
 
 router.post("/book-appointment", async (req, res) => {
   console.log("DB URL:", process.env.DATABASE_URL);
+  console.log("🔥 BOOK APPOINTMENT API HIT");
 
   let {
     phone,
@@ -62,13 +63,17 @@ router.post("/book-appointment", async (req, res) => {
       ]
     );
 
-    await sendAppointmentMail({
-        email,
-        patient_name,
-        date,
-        time: time_value,
-        doctor: doctor_name
-      })
+    console.log("📨 Calling mail function...");
+
+    sendAppointmentMail({
+      email,
+      patient_name,
+      date,
+      time: time_value,
+      doctor: doctor_name
+    }).catch(err => {
+      console.log("❌ Mail failed:", err.message);
+    });
 
 
     res.json({ success: true });

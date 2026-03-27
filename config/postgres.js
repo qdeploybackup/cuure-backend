@@ -1,11 +1,15 @@
 const { Pool } = require("pg");
-const { DATABASE_URL, NODE_ENV } = require("./env");
+
+// Load env variables (safe for local, ignored in Railway)
+require("dotenv").config();
+
+console.log("DB URL:", process.env.DATABASE_URL ? "Loaded ✅" : "Missing ❌");
 
 const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: NODE_ENV === "production"
-    ? { rejectUnauthorized: false }
-    : false,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // required for Railway
+  },
 });
 
 module.exports = pool;

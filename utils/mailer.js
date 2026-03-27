@@ -24,10 +24,7 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
   try {
     console.log("📨 Sending mail to:", email);
     await transporter.sendMail({
-      sender: {
-        name: "Cuure Healthcare",
-        email: "cuurehealth@gmail.com"
-      },
+      from: `"Cuure Healthcare" <cuurehealth@gmail.com>`,
       to: email,
       subject: "Appointment Confirmed ✅",
       replyTo: "cuurehealth@gmail.com",

@@ -4,8 +4,16 @@ const { Pool } = require("pg");
    POSTGRESQL CONNECTION
 ================================ */
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
+
+// Debug connection
+pool.connect()
+  .then(() => console.log("✅ Connected to Railway PostgreSQL"))
+  .catch(err => console.error("❌ DB Connection Error:", err));
 
 /* ===============================
    APPOINTMENTS CACHE

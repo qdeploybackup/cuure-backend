@@ -1,4 +1,5 @@
 node_modules
-
 service-account.json
 cuure.db
+.env
+env.js

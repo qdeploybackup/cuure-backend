@@ -1,35 +1,32 @@
-const nodemailer = require("nodemailer");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
-// LOGO (same as your UI version)
+// LOGO
 const LOGO_BASE64 = fs.readFileSync(path.join(__dirname, "logo.jpeg")).toString("base64");
 const LOGO_MIME = "image/jpeg";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
 const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) => {
-  console.log("📨 Mail function triggered");
-  try {
-    console.log("📨 Sending mail to:", email);
-    await transporter.sendMail({
-      from: `"Cuure Healthcare" <cuurehealth@gmail.com>`,
-      to: email,
-      subject: "Appointment Confirmed ✅",
-      replyTo: "cuurehealth@gmail.com",
+  console.log("📨 Sending mail via Brevo API to:", email);
 
-      html: `
+  try {
+    await axios.post(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        sender: {
+          name: "Cuure Healthcare",
+          email: "cuurehealth@gmail.com"
+        },
+        to: [
+          {
+            email: email,
+            name: patient_name
+          }
+        ],
+        subject: "Appointment Confirmed ✅",
+
+        // ✅ YOUR SAME HTML (UNCHANGED)
+        htmlContent: `
 <!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#eef2f7;font-family:Arial">
@@ -40,14 +37,12 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
 
 <table width="600" style="background:#fff;border-radius:12px;padding:20px">
 
-<!-- LOGO -->
 <tr>
 <td align="center">
 <img src="data:${LOGO_MIME};base64,${LOGO_BASE64}" width="150"/>
 </td>
 </tr>
 
-<!-- TITLE -->
 <tr>
 <td align="center" style="padding:20px">
 <h2 style="color:#0b1f3a">Appointment Confirmed ✅</h2>
@@ -55,7 +50,6 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
 </td>
 </tr>
 
-<!-- DETAILS -->
 <tr>
 <td style="padding:20px">
 
@@ -74,7 +68,6 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
 </td>
 </tr>
 
-<!-- FOOTER -->
 <tr>
 <td align="center" style="padding:20px;font-size:12px;color:#777">
 Thank you for choosing <b>Cuure Health</b> ❤️
@@ -89,14 +82,20 @@ Thank you for choosing <b>Cuure Health</b> ❤️
 
 </body>
 </html>
-      `
-
-    });
+        `
+      },
+      {
+        headers: {
+          "api-key": process.env.EMAIL_PASS,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
     console.log("✅ Email sent to:", email);
 
   } catch (err) {
-    console.error("❌ FULL EMAIL ERROR:", err);
+    console.error("❌ FULL EMAIL ERROR:", err.response?.data || err.message);
   }
 };
 

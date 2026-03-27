@@ -1,4 +1,7 @@
 console.log("👉 DATABASE_URL VALUE:", process.env.DATABASE_URL);
+console.log("🚀 ENV CHECK START");
+console.log("👉 DATABASE_URL VALUE:", process.env.DATABASE_URL);
+console.log("🚀 ENV CHECK END");
 
 const { Pool } = require("pg");
 

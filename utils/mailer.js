@@ -13,6 +13,9 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -27,6 +30,7 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
       },
       to: email,
       subject: "Appointment Confirmed ✅",
+      replyTo: "cuurehealth@gmail.com",
 
       html: `
 <!DOCTYPE html>
@@ -95,7 +99,7 @@ Thank you for choosing <b>Cuure Health</b> ❤️
     console.log("✅ Email sent to:", email);
 
   } catch (err) {
-    console.error("❌ Email error:", err.message);
+    console.error("❌ FULL EMAIL ERROR:", err);
   }
 };
 

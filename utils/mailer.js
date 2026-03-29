@@ -41,7 +41,7 @@ const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) 
 
 <tr>
 <td align="center">
-<img src="https://cuure-backend-production.up.railway.app/images/logo.jpeg" width="150"/>
+<img src="data:${LOGO_MIME};base64,${LOGO_BASE64}" width="150"/>
 </td>
 </tr>
 

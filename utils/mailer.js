@@ -3,7 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 // LOGO
-const LOGO_BASE64 = fs.readFileSync(path.join(__dirname, "logo.jpeg")).toString("base64");
+const LOGO_BASE64 = fs.readFileSync(
+  path.join(__dirname, "../public/images/logo.jpeg")
+).toString("base64");
 const LOGO_MIME = "image/jpeg";
 
 const sendAppointmentMail = async ({ email, patient_name, date, time, doctor }) => {

@@ -1,3 +1,4 @@
+app.use("/images", express.static("public/images"));
 require("dotenv").config();
 const app = require("./server");
 

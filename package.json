@@ -23,7 +23,7 @@
     "express-session": "^1.18.2",
     "googleapis": "^167.0.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.3",
     "pg": "^8.16.3",
     "xlsx": "^0.18.5"
   }

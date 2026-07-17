@@ -8,6 +8,11 @@ const adminRoute = require("./routes/admin.route");
 const adminApiRoute = require("./routes/adminApi.route");
 const websiteRoute = require("./routes/website.route");
 
+// AI Medical Chatbot Routes
+const chatRoutes = require('./routes/chat');
+const appointmentRoutes = require('./routes/appointment');
+const reportRoutes = require('./routes/report');
+
 const app = express();
 
 // app.use(cors({ origin: "http://localhost:3039", credentials: true }));
@@ -36,6 +41,11 @@ app.use("/webhook", webhookRoute);
 app.use("/admin", adminRoute);
 app.use("/api/admin", adminApiRoute);
 app.use("/api", websiteRoute);
+
+// Mount AI Medical Chatbot Routes
+app.use('/api/chat', chatRoutes);
+app.use('/api/book-appointment', appointmentRoutes);
+app.use('/api/upload-report', reportRoutes);
 
 app.get("/", (req, res) => {
   res.send("Cuure Healthcare Bot is live ✅");

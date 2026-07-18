@@ -165,6 +165,14 @@ const generateResponse = async (messages, conversationState = {}) => {
     };
   } catch (error) {
     console.error("Gemini API Error:", error);
+    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+      return {
+        text: "I am currently receiving too many requests or my API quota is exceeded. However, if you need medical assistance, you can proceed to book an appointment directly.",
+        questionType: "text",
+        options: [],
+        showBookingButton: true
+      };
+    }
     throw error;
   }
 };

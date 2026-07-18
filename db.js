@@ -8,6 +8,10 @@ const pool = new Pool({
     : false,
 });
 
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
+});
+
 const appointmentsCache = [];
 
 async function initDB() {

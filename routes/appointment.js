@@ -3,18 +3,38 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
-    const { name, phone, email, consultationType, preferredDate, preferredTime, reason } = req.body;
+    const { patient_name, phone, email, age, date, time_value, doctor_name, address } = req.body;
     
     // Validate required fields
-    if (!name || !phone || !consultationType || !preferredDate || !preferredTime || !reason) {
+    if (!patient_name || !phone || !date || !time_value || !doctor_name) {
       return res.status(400).json({ error: 'Missing required booking fields' });
     }
 
-    // In a real application, you would save this to a database here
-    console.log('New Appointment Booking received:', req.body);
+    // Validate phone (10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
 
-    // Simulate booking process delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Insert booking into database (align with DB columns)
+    await pool.query(
+      `INSERT INTO appointments 
+      (phone, patient_name, age, email, date, time_label, time_value, address, doctor_name, doctor_specialization, source)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);`,
+      [
+        phone,
+        patient_name,
+        age || null,
+        email || null,
+        date,
+        time_value, // using same value for time_label
+        time_value,
+        address,
+        doctor_name,
+        null,
+        "CHATBOT"
+      ]
+    );
 
     res.json({
       success: true,

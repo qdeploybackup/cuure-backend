@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { pool } = require("../config/db");
-const { sendAppointmentMail } = require("../utils/mailer");
+const { sendWebsiteAppointmentMail } = require("../utils/mailer");
 
 
 router.post("/book-appointment", async (req, res) => {
@@ -66,7 +66,7 @@ router.post("/book-appointment", async (req, res) => {
 
     console.log("📨 Calling mail function...");
 
-    sendAppointmentMail({
+    sendWebsiteAppointmentMail({
       email,
       patient_name,
       date,

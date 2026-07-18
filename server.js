@@ -11,6 +11,7 @@ const websiteRoute = require("./routes/website.route");
 // AI Medical Chatbot Routes
 const chatRoutes = require('./routes/chat');
 const appointmentRoutes = require('./routes/appointment');
+const chatbotAppointmentRoutes = require('./routes/chatbotAppointment');
 const reportRoutes = require('./routes/report');
 
 const app = express();
@@ -44,7 +45,7 @@ app.use("/api", websiteRoute);
 
 // Mount AI Medical Chatbot Routes
 app.use('/api/chat', chatRoutes);
-app.use('/api/book-appointment', appointmentRoutes);
+app.use('/api/chatbot-appointment', chatbotAppointmentRoutes);
 app.use('/api/upload-report', reportRoutes);
 
 app.get("/", (req, res) => {

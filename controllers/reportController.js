@@ -70,6 +70,9 @@ const uploadReport = [
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'File too large. Maximum size is 20MB.' });
       }
+      if (error.status === 429 || (error.message && error.message.includes('429'))) {
+        return res.status(429).json({ error: 'Our system is currently receiving too many requests or the API quota is exceeded. Please try again later.' });
+      }
 
       res.status(500).json({ error: "We couldn't summarize the report right now. Please try again." });
     }

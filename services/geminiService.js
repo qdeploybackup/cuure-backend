@@ -150,11 +150,15 @@ const generateResponse = async (messages, conversationState = {}) => {
       console.log("===== GEMINI RESPONSE =====");
 console.dir(response, { depth: null });
 console.log("===========================");
-      const text = response.text.trim();
-      const cleanText = text.replace(/^```json/i, '').replace(/```$/i, '').trim();
-      jsonResponse = JSON.parse(cleanText);
+const text =
+  response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+console.log("RAW JSON:");
+console.log(text);
+
+jsonResponse = JSON.parse(text);
     } catch (e) {
-      console.error("Failed to parse Gemini JSON output:", response.text, e);
+      console.error("Failed to parse Gemini JSON output:", text, e);
       jsonResponse = {
         text: response.text,
         questionType: "text",

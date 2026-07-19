@@ -124,18 +124,33 @@ You must ALWAYS respond with a valid JSON object matching this schema:
   "showBookingWizard": boolean
 }`;
 
+const extractJsonObject = (text) => {
+  const trimmed = text.trim();
+  const cleanText = trimmed.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    return null;
+  }
+};
+
 const generateResponse = async (messages, conversationState = {}) => {
   try {
     const history = messages.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
+      role: msg.role === 'user' ? 'user' : 'assistant',
       parts: [{ text: msg.content }]
     }));
 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [
-        { role: 'user', parts: [{ text: "System Prompt: " + getSystemPrompt(conversationState) }] },
-        { role: 'model', parts: [{ text: '{"text": "Understood. I will always respond in the requested JSON format.", "questionType": "text", "showBookingWizard": false}' }] },
+        { role: 'system', parts: [{ text: getSystemPrompt(conversationState) }] },
+        { role: 'assistant', parts: [{ text: '{"text": "Understood. I will always respond in the requested JSON format.", "questionType": "text", "showBookingWizard": false}' }] },
         ...history
       ],
       config: {
@@ -143,16 +158,13 @@ const generateResponse = async (messages, conversationState = {}) => {
       }
     });
 
-    let jsonResponse;
-    try {
-      const text = response.text.trim();
-      const cleanText = text.replace(/^```json/i, '').replace(/```$/i, '').trim();
-      jsonResponse = JSON.parse(cleanText);
-    } catch (e) {
-      console.error("Failed to parse Gemini JSON output:", response.text, e);
+    let jsonResponse = extractJsonObject(response.text || '');
+    if (!jsonResponse) {
+      console.error("Failed to parse Gemini JSON output:", response.text);
       jsonResponse = {
-        text: response.text,
+        text: response.text || 'Unable to interpret assistant response.',
         questionType: "text",
+        options: [],
         showBookingWizard: false
       };
     }
@@ -160,8 +172,8 @@ const generateResponse = async (messages, conversationState = {}) => {
     return {
       text: jsonResponse.text,
       questionType: jsonResponse.questionType || 'text',
-      options: jsonResponse.options || [],
-      showBookingButton: jsonResponse.showBookingWizard || false
+      options: Array.isArray(jsonResponse.options) ? jsonResponse.options : [],
+      showBookingButton: Boolean(jsonResponse.showBookingWizard)
     };
   } catch (error) {
     console.error("Gemini API Error:", error);

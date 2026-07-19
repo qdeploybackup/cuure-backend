@@ -99,83 +99,120 @@ const summarizeReport = async (filePath, mimeType, originalName) => {
   }
 };
 
-const getSystemPrompt = (conversationState) => `You are Cuure AI, a helpful healthcare assistant from Cuure Health. 
-Your primary goal is to gather symptom information, ask follow-up questions, and determine if the user should book an appointment.
+const getSystemPrompt = (conversationState) => `You are Cuure AI, a healthcare assistant.
 
-RULES:
-1. Ask ONLY ONE question at a time.
-2. Prefer multiple-choice questions whenever possible to make answering easy.
-3. AVOID repeating previous questions.
-4. Gather only the minimum information required.
-5. NEVER diagnose diseases or prescribe medication.
-6. Flag any life-threatening emergencies immediately and advise calling emergency services.
-7. Once enough information is collected (usually 2-3 exchanges), state that a consultation is recommended and naturally transition into booking.
+Rules:
+- Ask only one question at a time.
+- Prefer multiple-choice questions.
+- Never diagnose diseases.
+- Never prescribe medicines.
+- Recommend booking an appointment once enough information is collected.
 
-CONVERSATION STATE (MEMORY):
-${JSON.stringify(conversationState, null, 2)}
-Do not ask for information already present in the conversation state.
+Conversation State:
+${JSON.stringify(conversationState)}
 
-OUTPUT FORMAT:
-You must ALWAYS respond with a valid JSON object matching this schema:
+Return ONLY a valid JSON object.
+
+Do NOT use markdown.
+Do NOT use code fences.
+Do NOT add explanations.
+
+Example:
+
 {
-  "text": "The message to display to the user",
-  "questionType": "text" | "single-choice" | "multi-select",
-  "options": ["Option 1", "Option 2"],
-  "showBookingWizard": boolean
+  "text": "Hello! How can I help you today?",
+  "questionType": "single-choice",
+  "options": [
+    "Fever or Cold symptoms",
+    "Pain",
+    "General Checkup"
+  ],
+  "showBookingWizard": false
 }`;
 
 const generateResponse = async (messages, conversationState = {}) => {
   try {
     const history = messages.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
+      role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }]
     }));
 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [
-        { role: 'user', parts: [{ text: "System Prompt: " + getSystemPrompt(conversationState) }] },
-        { role: 'model', parts: [{ text: '{"text": "Understood. I will always respond in the requested JSON format.", "questionType": "text", "showBookingWizard": false}' }] },
-        ...history
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+                "System Prompt:\n" +
+                getSystemPrompt(conversationState),
+            },
+          ],
+        },
+        {
+          role: "model",
+          parts: [
+            {
+              text: JSON.stringify({
+                text: "Understood. I will always respond with valid JSON only.",
+                questionType: "text",
+                options: [],
+                showBookingWizard: false,
+              }),
+            },
+          ],
+        },
+        ...history,
       ],
-     config: {
-  responseMimeType: "application/json",
-  maxOutputTokens: 512,
-  temperature: 0,
-}
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0,
+        maxOutputTokens: 2048,
+      },
     });
 
+    console.log("===== GEMINI RESPONSE =====");
+    console.dir(response, { depth: null });
+    console.log("===========================");
+
+    let text =
+      response?.candidates?.[0]?.content?.parts
+        ?.map(part => part.text || "")
+        .join("")
+        .trim() || "";
+
+    console.log("RAW JSON:");
+    console.log(text);
+
+    if (!text) {
+      throw new Error("Gemini returned an empty response.");
+    }
+
     let jsonResponse;
+
     try {
-      console.log("===== GEMINI RESPONSE =====");
-console.dir(response, { depth: null });
-console.log("===========================");
-const text =
-  response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
-console.log("RAW JSON:");
-console.log(text);
-
-jsonResponse = JSON.parse(text);
+      jsonResponse = JSON.parse(text);
     } catch (e) {
       console.error("Failed to parse Gemini JSON output:", text, e);
+
       jsonResponse = {
-        text: response.text,
+        text: "Sorry, I couldn't process your request. Please try again.",
         questionType: "text",
-        showBookingWizard: false
+        options: [],
+        showBookingWizard: false,
       };
     }
 
     return {
       text: jsonResponse.text,
-      questionType: jsonResponse.questionType || 'text',
+      questionType: jsonResponse.questionType || "text",
       options: jsonResponse.options || [],
-      showBookingButton: jsonResponse.showBookingWizard || false
+      showBookingButton: jsonResponse.showBookingWizard || false,
     };
   } catch (error) {
     console.error("Gemini API Error:", error);
     throw error;
   }
 };
-
 module.exports = { generateResponse, summarizeReport };

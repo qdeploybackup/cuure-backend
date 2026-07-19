@@ -2,7 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 const REPORT_SYSTEM_PROMPT = `You are Cuure Health AI.
 

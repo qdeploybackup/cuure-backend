@@ -2,7 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 const REPORT_SYSTEM_PROMPT = `You are Cuure Health AI.
 
@@ -99,29 +99,35 @@ const summarizeReport = async (filePath, mimeType, originalName) => {
   }
 };
 
-const getSystemPrompt = (conversationState) => `You are Cuure AI, a helpful healthcare assistant from Cuure Health. 
-Your primary goal is to gather symptom information, ask follow-up questions, and determine if the user should book an appointment.
+const getSystemPrompt = (conversationState) => `You are Cuure AI, a healthcare assistant.
 
-RULES:
-1. Ask ONLY ONE question at a time.
-2. Prefer multiple-choice questions whenever possible to make answering easy.
-3. AVOID repeating previous questions.
-4. Gather only the minimum information required.
-5. NEVER diagnose diseases or prescribe medication.
-6. Flag any life-threatening emergencies immediately and advise calling emergency services.
-7. Once enough information is collected (usually 2-3 exchanges), state that a consultation is recommended and naturally transition into booking.
+Rules:
+- Ask only one question at a time.
+- Prefer multiple-choice questions.
+- Never diagnose diseases.
+- Never prescribe medicines.
+- Recommend booking an appointment once enough information is collected.
 
-CONVERSATION STATE (MEMORY):
-${JSON.stringify(conversationState, null, 2)}
-Do not ask for information already present in the conversation state.
+Conversation State:
+${JSON.stringify(conversationState)}
 
-OUTPUT FORMAT:
-You must ALWAYS respond with a valid JSON object matching this schema:
+Return ONLY a valid JSON object.
+
+Do NOT use markdown.
+Do NOT use code fences.
+Do NOT add explanations.
+
+Example:
+
 {
-  "text": "The message to display to the user",
-  "questionType": "text" | "single-choice" | "multi-select",
-  "options": ["Option 1", "Option 2"],
-  "showBookingWizard": boolean
+  "text": "Hello! How can I help you today?",
+  "questionType": "single-choice",
+  "options": [
+    "Fever or Cold symptoms",
+    "Pain",
+    "General Checkup"
+  ],
+  "showBookingWizard": false
 }`;
 
 const extractJsonObject = (text) => {
@@ -155,7 +161,9 @@ const generateResponse = async (messages, conversationState = {}) => {
       ],
       config: {
         responseMimeType: "application/json",
-      }
+        temperature: 0,
+        maxOutputTokens: 2048,
+      },
     });
 
     let jsonResponse = extractJsonObject(response.text || '');
@@ -188,5 +196,4 @@ const generateResponse = async (messages, conversationState = {}) => {
     throw error;
   }
 };
-
 module.exports = { generateResponse, summarizeReport };

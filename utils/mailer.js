@@ -6,6 +6,7 @@ const path = require("path");
 const LOGO_BASE64 = fs.readFileSync(
   path.join(__dirname, "../public/images/logo.jpeg")
 ).toString("base64");
+
 const LOGO_MIME = "image/jpeg";
 
 /* ───────────────────────────────────────────────

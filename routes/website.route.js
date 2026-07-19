@@ -3,7 +3,6 @@ const router = express.Router();
 const { pool } = require("../config/db");
 const { sendWebsiteAppointmentMail } = require("../utils/mailer");
 
-
 router.post("/book-appointment", async (req, res) => {
   console.log("DB URL:", process.env.DATABASE_URL);
   console.log("🔥 BOOK APPOINTMENT API HIT");
@@ -12,16 +11,11 @@ router.post("/book-appointment", async (req, res) => {
     phone,
     patient_name,
     email,
-    age,
-    date,
-    time_value,
-    time_label,
-    doctor_name,
-    doctor_specialization,
+    gender,
     address
   } = req.body || {};
 
-  // normalize phone
+  // Normalize phone
   phone = (phone || "")
     .toString()
     .trim()
@@ -35,68 +29,92 @@ router.post("/book-appointment", async (req, res) => {
     });
   }
 
-  if (!patient_name || !date || !time_value || !doctor_name) {
+  if (!patient_name) {
     return res.status(400).json({
       success: false,
-      message: "Missing required fields"
+      message: "Patient name is required"
     });
   }
 
   try {
-    await pool.query(
 
-      `INSERT INTO appointments 
-      (phone, patient_name, age, email, date, time_label, time_value, address, doctor_name, doctor_specialization, source)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);`,
+    await pool.query(
+      `
+      INSERT INTO appointments
+      (
+        phone,
+        patient_name,
+        age,
+        email,
+        date,
+        time_label,
+        time_value,
+        address,
+        location_link,
+        doctor_name,
+        doctor_specialization,
+        source
+      )
+      VALUES
+      (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+      );
+      `,
       [
         phone,
         patient_name,
-        age || null,
+        null,              // age
         email || null,
-        date,
-        time_value, // use same for label
-        time_value,
+        null,              // date
+        null,              // time_label
+        null,              // time_value
         address || null,
-        doctor_name,
-        doctor_specialization || null,
+        null,              // location_link
+        null,              // doctor_name
+        null,              // doctor_specialization
         "WEBSITE"
       ]
     );
+
     console.log("✅ Appointment saved");
 
     console.log("📨 Calling mail function...");
 
     sendWebsiteAppointmentMail({
       email,
-      patient_name,
-      date,
-      time: time_value,
-      doctor: doctor_name
-    }).catch(err => {
-      console.log("❌ Mail failed:", err.message);
+      patient_name
     });
 
-
-    res.json({ success: true });
+    return res.json({
+      success: true,
+      message: "Appointment request submitted successfully."
+    });
 
   } catch (err) {
+
     console.error("Website booking error:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "Failed to book appointment"
     });
+
   }
 });
 
 /* ===============================
    GET BOOKED SLOTS
 ================================ */
+
 router.get("/booked-slots", async (req, res) => {
 
   const { doctor_name, date } = req.query;
 
   if (!doctor_name || !date) {
-    return res.json({ success: true, data: [] });
+    return res.json({
+      success: true,
+      data: []
+    });
   }
 
   try {
@@ -117,11 +135,14 @@ router.get("/booked-slots", async (req, res) => {
     });
 
   } catch (err) {
+
     console.error("Slot fetch error:", err);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch booked slots"
     });
+
   }
 
 });

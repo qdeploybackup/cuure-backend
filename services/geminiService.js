@@ -138,13 +138,18 @@ const generateResponse = async (messages, conversationState = {}) => {
         { role: 'model', parts: [{ text: '{"text": "Understood. I will always respond in the requested JSON format.", "questionType": "text", "showBookingWizard": false}' }] },
         ...history
       ],
-      config: {
-        responseMimeType: "application/json",
-      }
+     config: {
+  responseMimeType: "application/json",
+  maxOutputTokens: 512,
+  temperature: 0,
+}
     });
 
     let jsonResponse;
     try {
+      console.log("===== GEMINI RESPONSE =====");
+console.dir(response, { depth: null });
+console.log("===========================");
       const text = response.text.trim();
       const cleanText = text.replace(/^```json/i, '').replace(/```$/i, '').trim();
       jsonResponse = JSON.parse(cleanText);

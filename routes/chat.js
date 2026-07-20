@@ -26,7 +26,13 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Chat API Error:', error);
-    res.status(500).json({ error: 'Failed to process chat request' });
+    // Return a friendly, consistent response payload so the frontend can display it
+    return res.json({
+      text: 'Sorry, I am having trouble connecting. Please try again.',
+      questionType: 'text',
+      options: [],
+      showBookingButton: false
+    });
   }
 });
 

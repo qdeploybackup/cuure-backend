@@ -1,8 +1,116 @@
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
+const { performance } = require('perf_hooks');
+
+// Configuration (tunable via environment)
+const GEMINI_MAX_RETRIES = parseInt(process.env.GEMINI_MAX_RETRIES, 10) || 4;
+const GEMINI_BASE_DELAY_MS = parseInt(process.env.GEMINI_BASE_DELAY_MS, 10) || 500;
+const GEMINI_MAX_JITTER_MS = parseInt(process.env.GEMINI_MAX_JITTER_MS, 10) || 200;
+const GEMINI_CALL_TIMEOUT_MS = parseInt(process.env.GEMINI_CALL_TIMEOUT_MS, 10) || 10000;
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const primaryModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || null;
+const modelName = primaryModel; // for backward-compat logging
+
+// Basic sanity checks / visibility
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('Warning: GEMINI_API_KEY is not set. Gemini requests will fail without a valid API key.');
+} else {
+  console.info('Gemini API key loaded from environment');
+}
+console.info(`Using Gemini model: ${modelName}`);
+
+// Transient errors to retry: 429, 500, 502, 503, 504 and common network/connect timeouts
+const isTransientError = (err) => {
+  const msg = (err && (err.message || '')).toString();
+  const code = err && err.code;
+  const status = err && err.status;
+  const transientStatuses = [429, 500, 502, 503, 504];
+  return (
+    transientStatuses.includes(Number(status)) ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    msg.includes('Connect Timeout') ||
+    msg.includes('fetch failed') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('UNAVAILABLE')
+  );
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const runWithTimeout = (promiseFactory, timeoutMs) => {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const timer = setTimeout(() => {
+      if (finished) return;
+      const e = new Error('Connect Timeout Error');
+      e.code = 'UND_ERR_CONNECT_TIMEOUT';
+      finished = true;
+      reject(e);
+    }, timeoutMs);
+
+    promiseFactory()
+      .then((r) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        resolve(r);
+      })
+      .catch((err) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+};
+
+/**
+ * Call a function with retries, exponential backoff and jitter.
+ * Logs concise info about attempts and elapsed time.
+ */
+const callWithRetries = async (fn, args, maxAttempts = GEMINI_MAX_RETRIES, baseDelay = GEMINI_BASE_DELAY_MS) => {
+  const start = performance.now();
+  let attempt = 0;
+  let lastErr = null;
+
+  while (attempt < maxAttempts) {
+    const attemptStart = performance.now();
+    try {
+      const result = await runWithTimeout(() => fn(...args), GEMINI_CALL_TIMEOUT_MS);
+      const elapsed = Math.round(performance.now() - start);
+      console.info(`Gemini call succeeded (attempt ${attempt + 1}/${maxAttempts}) elapsed=${elapsed}ms`);
+      return result;
+    } catch (err) {
+      lastErr = err;
+      const elapsed = Math.round(performance.now() - start);
+      const status = err && (err.status || err.code || 'unknown');
+
+      // If not transient or last attempt, break and rethrow below
+      if (!isTransientError(err) || attempt === maxAttempts - 1) {
+        console.warn(`Gemini call failed final (attempt ${attempt + 1}/${maxAttempts}) status=${status} elapsed=${elapsed}ms message=${(err.message||'').split('\n')[0]}`);
+        break;
+      }
+
+      // compute backoff + jitter
+      const backoff = baseDelay * Math.pow(2, attempt);
+      const jitter = Math.floor(Math.random() * GEMINI_MAX_JITTER_MS);
+      const delay = backoff + jitter;
+
+      console.warn(`Gemini transient error, attempt ${attempt + 1}/${maxAttempts} status=${status} elapsed=${elapsed}ms — retrying in ${delay}ms message=${(err.message||'').split('\n')[0]}`);
+      await sleep(delay);
+      attempt++;
+    }
+  }
+
+  // attach retry metadata to the error
+  if (lastErr) {
+    lastErr.retryAttempts = attempt + 1;
+    lastErr.elapsedMs = Math.round(performance.now() - start);
+  }
+  throw lastErr;
+};
 
 const REPORT_SYSTEM_PROMPT = `You are Cuure Health AI.
 
@@ -68,7 +176,7 @@ const summarizeReport = async (filePath, mimeType, originalName) => {
       throw new Error('File processing failed in Gemini API');
     }
 
-    const response = await ai.models.generateContent({
+    const payload = {
       model: modelName,
       contents: [
         {
@@ -79,7 +187,26 @@ const summarizeReport = async (filePath, mimeType, originalName) => {
           ]
         }
       ]
-    });
+    };
+
+    // Helper to call Gemini with a specific model
+    const generateWithModel = async (modelToUse) => {
+      const payloadClone = Object.assign({}, payload, { model: modelToUse });
+      return await callWithRetries((p) => ai.models.generateContent(p), [payloadClone]);
+    };
+
+    let response;
+    try {
+      response = await generateWithModel(primaryModel);
+    } catch (err) {
+      // If transient and fallback model configured and different, try fallback once
+      if (isTransientError(err) && fallbackModel && fallbackModel !== primaryModel) {
+        console.warn(`Primary model ${primaryModel} failed with transient error; attempting fallback model ${fallbackModel}`);
+        response = await generateWithModel(fallbackModel);
+      } else {
+        throw err;
+      }
+    }
 
     const summary = response.text.trim();
 
@@ -95,6 +222,14 @@ const summarizeReport = async (filePath, mimeType, originalName) => {
     if (uploadedFile) {
       try { await ai.files.delete({ name: uploadedFile.name }); } catch (e) { /* ignore */ }
     }
+    // If transient/unavailable, throw a clear error with status for the controller to map to 429/503
+    if (isTransientError(error)) {
+      const out = new Error('Gemini is temporarily unavailable. Please try again later.');
+      out.status = error.status || (error.code === 'UND_ERR_CONNECT_TIMEOUT' ? 504 : 503);
+      out.original = (error && error.message) || error;
+      throw out;
+    }
+    // Non-transient: rethrow to let caller handle it
     throw error;
   }
 };
@@ -146,7 +281,7 @@ const generateResponse = async (messages, conversationState = {}) => {
       parts: [{ text: msg.content }]
     }));
 
-    const response = await ai.models.generateContent({
+    const payload = {
       model: modelName,
       contents: [
         { role: 'system', parts: [{ text: getSystemPrompt(conversationState) }] },
@@ -156,11 +291,29 @@ const generateResponse = async (messages, conversationState = {}) => {
       config: {
         responseMimeType: "application/json",
       }
-    });
+    };
+
+    // Helper to call Gemini with a specific model
+    const generateWithModel = async (modelToUse) => {
+      const payloadClone = Object.assign({}, payload, { model: modelToUse });
+      return await callWithRetries((p) => ai.models.generateContent(p), [payloadClone]);
+    };
+
+    let response;
+    try {
+      response = await generateWithModel(primaryModel);
+    } catch (err) {
+      if (isTransientError(err) && fallbackModel && fallbackModel !== primaryModel) {
+        console.warn(`Primary model ${primaryModel} failed; trying fallback model ${fallbackModel}`);
+        response = await generateWithModel(fallbackModel);
+      } else {
+        throw err;
+      }
+    }
 
     let jsonResponse = extractJsonObject(response.text || '');
     if (!jsonResponse) {
-      console.error("Failed to parse Gemini JSON output:", response.text);
+      console.warn("Failed to parse Gemini JSON output (non-JSON response)");
       jsonResponse = {
         text: response.text || 'Unable to interpret assistant response.',
         questionType: "text",
@@ -176,16 +329,29 @@ const generateResponse = async (messages, conversationState = {}) => {
       showBookingButton: Boolean(jsonResponse.showBookingWizard)
     };
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+    const status = error && (error.status || error.code || 'unknown');
+    const msg = (error && (error.message || '')).toString();
+    const retryAttempts = error && error.retryAttempts;
+    const elapsedMs = error && error.elapsedMs;
+    console.warn(`Gemini API Error: status=${status} message=${msg.split('\n')[0]} attempts=${retryAttempts||0} elapsed=${elapsedMs||'unknown'}ms`);
+
+    // If the model is overloaded or quota exceeded, provide helpful fallback with booking option
+    if (status === 429 || status === 503 || (msg && msg.includes('429')) || (msg && msg.includes('UNAVAILABLE'))) {
       return {
-        text: "I am currently receiving too many requests or my API quota is exceeded. However, if you need medical assistance, you can proceed to book an appointment directly.",
+        text: "I am currently receiving too many requests or the model is temporarily unavailable. Please try again in a few moments, or proceed to book an appointment.",
         questionType: "text",
         options: [],
         showBookingButton: true
       };
     }
-    throw error;
+
+    // Generic fallback for other errors to avoid crashing the chat flow
+    return {
+      text: "Sorry, I am having trouble connecting. Please try again.",
+      questionType: "text",
+      options: [],
+      showBookingButton: false
+    };
   }
 };
 

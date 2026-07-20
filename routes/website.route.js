@@ -55,22 +55,12 @@ router.post("/book-appointment", async (req, res) => {
   }
 
   // Required fields validation
-  const missingFields = [];
-
-  if (!patient_name) missingFields.push("patient_name");
-  if (!date) missingFields.push("date");
-  if (!time_value) missingFields.push("time_value");
-  if (!doctor_name) missingFields.push("doctor_name");
-
-  if (missingFields.length > 0) {
-    console.log("❌ Missing Fields:", missingFields);
-
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields",
-      missingFields
-    });
-  }
+if (!patient_name) {
+  return res.status(400).json({
+    success: false,
+    message: "Patient name is required"
+  });
+}
 
   try {
     const result = await pool.query(
@@ -93,33 +83,31 @@ router.post("/book-appointment", async (req, res) => {
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *;
       `,
-      [
-        phone,
-        patient_name,
-        age || null,
-        email || null,
-        date,
-        time_value,
-        time_value,
-        address || null,
-        doctor_name,
-        doctor_specialization || null,
-        "WEBSITE"
-      ]
+   [
+  phone,
+  patient_name,
+  age || null,
+  email || null,
+  date || null,
+  time_label || null,
+  time_value || null,
+  address || null,
+  doctor_name || null,
+  doctor_specialization || null,
+  "WEBSITE"
+]
     );
 
     console.log("✅ Appointment Saved");
     console.log(result.rows[0]);
 
-    sendWebsiteAppointmentMail({
-      email,
-      patient_name,
-      date,
-      time: time_value,
-      doctor: doctor_name
-    }).catch(err => {
-      console.error("❌ Mail Error:", err.message);
-    });
+   sendWebsiteAppointmentMail({
+  email,
+  patient_name,
+  date: date || "Not Selected",
+  time: time_value || "Not Selected",
+  doctor: doctor_name || "General Consultation"
+});
 
     return res.status(200).json({
       success: true,

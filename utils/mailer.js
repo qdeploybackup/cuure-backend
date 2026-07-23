@@ -3,10 +3,19 @@ const fs = require("fs");
 const path = require("path");
 
 // LOGO
-const LOGO_BASE64 = fs.readFileSync(
-  path.join(__dirname, "../public/images/logo.jpeg")
-).toString("base64");
-const LOGO_MIME = "image/jpeg";
+const logoPath = path.join(
+  __dirname,
+  "..",
+  "public",
+  "images",
+  "cuure.health.png"
+);
+
+console.log("Logo Path:", logoPath);
+console.log("Exists:", fs.existsSync(logoPath));
+
+const LOGO_BASE64 = fs.readFileSync(logoPath).toString("base64");
+const LOGO_MIME = "image/png";
 
 /* ───────────────────────────────────────────────
    Helper: build CC recipients array from env

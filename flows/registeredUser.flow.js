@@ -6,7 +6,10 @@ const { appointmentsCache } = require("../db/initDB");
 const fetch = global.fetch || require("node-fetch");
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
-
+const {
+  sendPatientConfirmationMail,
+  sendAdminNotificationMail
+} = require("../utils/mailer");
 const { notifyDoctor } = require("../services/doctor.service");
 
 const {
@@ -174,7 +177,29 @@ async function handleRegisteredUser(from, text, interactiveId) {
         doctor.specialization
       ]
     );
-    console.log("✅ Appointment saved to DB - ID:", res.rows[0].id);
+    
+    try {
+  await sendPatientConfirmationMail({
+    email: null, // WhatsApp booking doesn't collect email
+    patient_name: record.patient_name,
+    phone: record.phone
+  });
+} catch (err) {
+  console.error("Patient email failed:", err.message);
+}
+
+try {
+  await sendAdminNotificationMail({
+    patient_name: record.patient_name,
+    phone: record.phone,
+    email: null,
+    reason: doctor.specialization,
+    source: "WhatsApp",
+    bookedAt: new Date()
+  });
+} catch (err) {
+  console.error("Admin email failed:", err.message);
+}
   } catch (err) {
     console.error("❌ Error inserting appointment:", err);
   }

@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/db');
-const { sendAppointmentMail } = require('../utils/mailer');
+const {
+  sendPatientConfirmationMail,
+  sendAdminNotificationMail
+} = require('../utils/mailer');
 
 router.post('/', async (req, res) => {
   console.log('🔥 CHATBOT APPOINTMENT API HIT');
@@ -46,20 +49,29 @@ router.post('/', async (req, res) => {
     const appointmentId = result.rows[0]?.id;
     console.log(`✅ Chatbot appointment saved — DB id: ${appointmentId}`);
 
-    // ── 2. Send confirmation email (non-blocking, but logged) ────────
-    sendAppointmentMail({
-      email: email ? email.trim() : null,
-      patient_name,
-      gender,
-      address: address || 'Not specified',
-      phone
-    })
-      .then(() => {
-        console.log(`📧 Email notification dispatched for appointment #${appointmentId}`);
-      })
-      .catch((err) => {
-        console.error(`❌ Email failed for appointment #${appointmentId}:`, err.message);
-      });
+// ── 2. Send emails ───────────────────────────────────────────────
+  try {
+  await sendPatientConfirmationMail({
+    email: email ? email.trim() : null,
+    patient_name,
+    phone
+  });
+} catch (err) {
+  console.error("Patient email failed:", err.message);
+}
+
+try {
+  await sendAdminNotificationMail({
+    patient_name,
+    phone,
+    email: email ? email.trim() : null,
+    gender,
+    source: "AI Chatbot",
+    bookedAt: new Date()
+  });
+} catch (err) {
+  console.error("Admin email failed:", err.message);
+}
 
     // ── 3. Respond to client immediately ────────────────────────────
     return res.json({

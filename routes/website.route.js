@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const { pool } = require("../config/db");
-const { sendWebsiteAppointmentMail } = require("../utils/mailer");
+const {
+  sendPatientConfirmationMail,
+  sendAdminNotificationMail
+} = require("../utils/mailer");
 
 /* ===============================
    BOOK APPOINTMENT
@@ -101,13 +104,28 @@ if (!patient_name) {
     console.log("✅ Appointment Saved");
     console.log(result.rows[0]);
 
-   sendWebsiteAppointmentMail({
-  email,
-  patient_name,
-  date: date || "Not Selected",
-  time: time_value || "Not Selected",
-  doctor: doctor_name || "General Consultation"
-});
+   try {
+  await sendPatientConfirmationMail({
+    email,
+    patient_name,
+    phone
+  });
+} catch (err) {
+  console.error("Patient email failed:", err.message);
+}
+
+try {
+  await sendAdminNotificationMail({
+    patient_name,
+    phone,
+    email,
+    reason: doctor_specialization || doctor_name || "General Consultation",
+    source: "Website",
+    bookedAt: new Date()
+  });
+} catch (err) {
+  console.error("Admin email failed:", err.message);
+}
 
     return res.status(200).json({
       success: true,
